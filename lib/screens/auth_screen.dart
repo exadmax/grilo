@@ -174,9 +174,27 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         });
       }
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        _erroLogin = e.message ?? 'Falha ao autenticar com Google.';
-      });
+      if (kIsWeb && _deveUsarRedirectNoWeb(e.code)) {
+        try {
+          final provider = GoogleAuthProvider()
+            ..addScope('email')
+            ..setCustomParameters({'prompt': 'select_account'});
+          await ref.read(firebaseAuthProvider).signInWithRedirect(provider);
+          return;
+        } on FirebaseAuthException catch (redirectError) {
+          setState(() {
+            _erroLogin = _mensagemErroGoogle(redirectError);
+          });
+        } catch (_) {
+          setState(() {
+            _erroLogin = 'Nao foi possivel redirecionar para o login Google.';
+          });
+        }
+      } else {
+        setState(() {
+          _erroLogin = _mensagemErroGoogle(e);
+        });
+      }
     } catch (_) {
       setState(() {
         _erroLogin = 'Não foi possível entrar com Google agora.';
@@ -187,6 +205,27 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           _loadingGoogle = false;
         });
       }
+    }
+  }
+
+  bool _deveUsarRedirectNoWeb(String code) {
+    return code == 'popup-blocked' || code == 'popup-closed-by-user';
+  }
+
+  String _mensagemErroGoogle(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'popup-blocked':
+        return 'O navegador bloqueou o popup. Vamos tentar por redirecionamento.';
+      case 'popup-closed-by-user':
+        return 'O popup foi fechado antes de concluir o login.';
+      case 'unauthorized-domain':
+        return 'Dominio nao autorizado no Firebase Auth. Adicione exadmax.github.io em Authentication > Settings > Authorized domains.';
+      case 'operation-not-allowed':
+        return 'Ative o provedor Google em Firebase Authentication > Sign-in method.';
+      case 'network-request-failed':
+        return 'Falha de rede ao autenticar com Google. Verifique sua conexao e tente novamente.';
+      default:
+        return e.message ?? 'Falha ao autenticar com Google.';
     }
   }
 
