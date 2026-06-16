@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -108,6 +109,11 @@ final toastProvider = NotifierProvider<ToastNotifier, String?>(ToastNotifier.new
 // ── Firebase Auth ───────────────────────────────────────────────────────────
 
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) => FirebaseAuth.instance);
+
+final authRedirectResultProvider = FutureProvider<UserCredential?>((ref) async {
+  if (!kIsWeb) return null;
+  return ref.watch(firebaseAuthProvider).getRedirectResult();
+});
 
 final authStateChangesProvider = StreamProvider<User?>((ref) {
   return ref.watch(firebaseAuthProvider).authStateChanges();
