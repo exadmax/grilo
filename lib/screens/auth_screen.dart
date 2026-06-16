@@ -145,7 +145,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         final provider = GoogleAuthProvider()
           ..addScope('email')
           ..setCustomParameters({'prompt': 'select_account'});
-        await auth.signInWithPopup(provider);
+        await auth.signInWithRedirect(provider);
       } else {
         await GoogleSignIn.instance.initialize();
         final googleUser = await GoogleSignIn.instance.authenticate();
@@ -174,27 +174,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         });
       }
     } on FirebaseAuthException catch (e) {
-      if (kIsWeb && _deveUsarRedirectNoWeb(e.code)) {
-        try {
-          final provider = GoogleAuthProvider()
-            ..addScope('email')
-            ..setCustomParameters({'prompt': 'select_account'});
-          await ref.read(firebaseAuthProvider).signInWithRedirect(provider);
-          return;
-        } on FirebaseAuthException catch (redirectError) {
-          setState(() {
-            _erroLogin = _mensagemErroGoogle(redirectError);
-          });
-        } catch (_) {
-          setState(() {
-            _erroLogin = 'Nao foi possivel redirecionar para o login Google.';
-          });
-        }
-      } else {
-        setState(() {
-          _erroLogin = _mensagemErroGoogle(e);
-        });
-      }
+      setState(() {
+        _erroLogin = _mensagemErroGoogle(e);
+      });
     } catch (_) {
       setState(() {
         _erroLogin = 'Não foi possível entrar com Google agora.';
@@ -208,16 +190,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
-  bool _deveUsarRedirectNoWeb(String code) {
-    return code == 'popup-blocked' || code == 'popup-closed-by-user';
-  }
-
   String _mensagemErroGoogle(FirebaseAuthException e) {
     switch (e.code) {
-      case 'popup-blocked':
-        return 'O navegador bloqueou o popup. Vamos tentar por redirecionamento.';
-      case 'popup-closed-by-user':
-        return 'O popup foi fechado antes de concluir o login.';
       case 'unauthorized-domain':
         return 'Dominio nao autorizado no Firebase Auth. Adicione exadmax.github.io em Authentication > Settings > Authorized domains.';
       case 'operation-not-allowed':
