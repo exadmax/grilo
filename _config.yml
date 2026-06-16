@@ -1,0 +1,14 @@
+# Jekyll config for GitHub Pages — exadmax.github.io/grilo
+# O Flutter build gera pastas com prefixo "_" (ex: _flutter, _framework).
+# A linha abaixo garante que Jekyll não as exclua ao servir os assets.
+include:
+  - _flutter
+  - _framework
+
+# Caminho base alinhado com o --base-href do flutter build web
+baseurl: "/grilo"
+url: "https://exadmax.github.io"
+
+# Desativa o tema padrão do GitHub Pages — o Flutter cuida do próprio HTML
+theme: null
+plugins: []

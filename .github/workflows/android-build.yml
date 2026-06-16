@@ -1,0 +1,98 @@
+name: Mobile and Web Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Permissões necessárias para o deploy no GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Garante que apenas um deploy rode por vez; cancela runs em andamento
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inject google-services.json
+        run: |
+          echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "stable"
+          channel: "stable"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+  build-web:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "stable"
+          channel: "stable"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Expand DART_WEB_SECRETS
+        id: secrets
+        run: |
+          echo '${{ secrets.DART_WEB_SECRETS }}' > /tmp/dart_web_secrets.json
+          echo "API_KEY=$(jq -r .FIREBASE_WEB_API_KEY /tmp/dart_web_secrets.json)" >> $GITHUB_ENV
+          echo "APP_ID=$(jq -r .FIREBASE_WEB_APP_ID /tmp/dart_web_secrets.json)" >> $GITHUB_ENV
+          echo "MSG_SENDER=$(jq -r .FIREBASE_WEB_MESSAGING_SENDER_ID /tmp/dart_web_secrets.json)" >> $GITHUB_ENV
+          echo "PROJECT_ID=$(jq -r .FIREBASE_WEB_PROJECT_ID /tmp/dart_web_secrets.json)" >> $GITHUB_ENV
+          echo "AUTH_DOMAIN=$(jq -r .FIREBASE_WEB_AUTH_DOMAIN /tmp/dart_web_secrets.json)" >> $GITHUB_ENV
+          echo "STORAGE_BUCKET=$(jq -r .FIREBASE_WEB_STORAGE_BUCKET /tmp/dart_web_secrets.json)" >> $GITHUB_ENV
+          echo "MEASUREMENT_ID=$(jq -r .FIREBASE_WEB_MEASUREMENT_ID /tmp/dart_web_secrets.json)" >> $GITHUB_ENV
+          rm /tmp/dart_web_secrets.json
+
+      - name: Build Web
+        run: |
+          flutter build web --release \
+            --base-href=/grilo/ \
+            --dart-define=FIREBASE_WEB_API_KEY=${{ env.API_KEY }} \
+            --dart-define=FIREBASE_WEB_APP_ID=${{ env.APP_ID }} \
+            --dart-define=FIREBASE_WEB_MESSAGING_SENDER_ID=${{ env.MSG_SENDER }} \
+            --dart-define=FIREBASE_WEB_PROJECT_ID=${{ env.PROJECT_ID }} \
+            --dart-define=FIREBASE_WEB_AUTH_DOMAIN=${{ env.AUTH_DOMAIN }} \
+            --dart-define=FIREBASE_WEB_STORAGE_BUCKET=${{ env.STORAGE_BUCKET }} \
+            --dart-define=FIREBASE_WEB_MEASUREMENT_ID=${{ env.MEASUREMENT_ID }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy-web:
+    # Só faz deploy quando for push direto na main (não em PRs)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-web
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
